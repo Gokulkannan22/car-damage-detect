@@ -97,9 +97,9 @@ if image:
 
     col1, col2 = st.columns(2)
     with col1:
-        st.image(image, caption="🖼️ Input Image", use_column_width=True)
+        st.image(image, caption="🖼️ Input Image", use_container_width=True)
     with col2:
-        st.image(heatmap_img, caption="🔥 Grad-CAM Heatmap", use_column_width=True)
+        st.image(heatmap_img, caption="🔥 Grad-CAM Heatmap", use_container_width=True)
 
     # 📥 Downloadable report
     report_str = f"Predicted class: {predicted_label}\nModel: ResNet18\nGrad-CAM applied: Yes"
