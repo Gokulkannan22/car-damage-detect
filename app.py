@@ -21,18 +21,31 @@ model_path = "car_damage_model.pth"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # ----------------------------------
-# ✅ Download model from Google Drive
+# ✅ Robust Google Drive Downloader
 def download_model_from_drive(file_id, filename):
-    """Download a file from Google Drive if it doesn't exist."""
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    if not os.path.exists(filename):
-        print("🔽 Downloading model from Google Drive...")
-        response = requests.get(url)
-        with open(filename, "wb") as f:
-            f.write(response.content)
-        print("✅ Model downloaded.")
+    """Download a file from Google Drive using chunked streaming (handles confirmation tokens)."""
+    URL = "https://docs.google.com/uc?export=download"
+    session = requests.Session()
 
-# Call the download function before loading model
+    response = session.get(URL, params={'id': file_id}, stream=True)
+
+    def get_confirm_token(response):
+        for key, value in response.cookies.items():
+            if key.startswith('download_warning'):
+                return value
+        return None
+
+    token = get_confirm_token(response)
+    if token:
+        params = {'id': file_id, 'confirm': token}
+        response = session.get(URL, params=params, stream=True)
+
+    with open(filename, "wb") as f:
+        for chunk in response.iter_content(32768):
+            if chunk:
+                f.write(chunk)
+
+# Download model before loading
 download_model_from_drive("1b-vO7pxnKlnhbS_-0E6Rzzz-QxOC_jg5", model_path)
 
 # ----------------------------------
