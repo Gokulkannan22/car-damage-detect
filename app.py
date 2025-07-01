@@ -10,9 +10,8 @@ from torchcam.methods import SmoothGradCAMpp
 from torchcam.utils import overlay_mask
 from torchvision.transforms.functional import to_pil_image
 from PIL import Image
-import requests
-import os
 from io import StringIO
+import os
 
 # ----------------------------------
 # ✅ Config
@@ -21,35 +20,7 @@ model_path = "car_damage_model.pth"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # ----------------------------------
-# ✅ Robust Google Drive Downloader
-def download_model_from_drive(file_id, filename):
-    """Download a file from Google Drive using chunked streaming (handles confirmation tokens)."""
-    URL = "https://docs.google.com/uc?export=download"
-    session = requests.Session()
-
-    response = session.get(URL, params={'id': file_id}, stream=True)
-
-    def get_confirm_token(response):
-        for key, value in response.cookies.items():
-            if key.startswith('download_warning'):
-                return value
-        return None
-
-    token = get_confirm_token(response)
-    if token:
-        params = {'id': file_id, 'confirm': token}
-        response = session.get(URL, params=params, stream=True)
-
-    with open(filename, "wb") as f:
-        for chunk in response.iter_content(32768):
-            if chunk:
-                f.write(chunk)
-
-# Download model before loading
-download_model_from_drive("1b-vO7pxnKlnhbS_-0E6Rzzz-QxOC_jg5", model_path)
-
-# ----------------------------------
-# ✅ Load model
+# ✅ Load model (no download needed)
 @st.cache_resource
 def load_model():
     model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
@@ -101,8 +72,6 @@ def predict_and_visualize(image):
 # ----------------------------------
 # ✅ Streamlit UI
 st.title("🚗 Car Damage Detection with Grad-CAM")
-
-# 📤 Image input section
 st.subheader("📸 Choose Image Source")
 input_option = st.radio("Select image input mode:", ["Upload Image", "Use Camera"])
 
@@ -126,16 +95,13 @@ if image:
 
     st.success(f"✅ Predicted: **{predicted_label}**")
 
-    # 🔄 Side-by-side display
     col1, col2 = st.columns(2)
-
     with col1:
         st.image(image, caption="🖼️ Input Image", use_column_width=True)
-
     with col2:
         st.image(heatmap_img, caption="🔥 Grad-CAM Heatmap", use_column_width=True)
 
-    # 📥 Download Prediction Report
+    # 📥 Downloadable report
     report_str = f"Predicted class: {predicted_label}\nModel: ResNet18\nGrad-CAM applied: Yes"
     st.download_button(
         label="📥 Download Prediction Report",
