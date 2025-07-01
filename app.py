@@ -10,13 +10,30 @@ from torchcam.methods import SmoothGradCAMpp
 from torchcam.utils import overlay_mask
 from torchvision.transforms.functional import to_pil_image
 from PIL import Image
+import requests
 import os
+from io import StringIO
 
 # ----------------------------------
 # ✅ Config
 class_names = ['F_Breakage', 'F_Crushed', 'F_Normal', 'R_Breakage', 'R_Crushed', 'R_Normal']
 model_path = "car_damage_model.pth"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# ----------------------------------
+# ✅ Download model from Google Drive
+def download_model_from_drive(file_id, filename):
+    """Download a file from Google Drive if it doesn't exist."""
+    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    if not os.path.exists(filename):
+        print("🔽 Downloading model from Google Drive...")
+        response = requests.get(url)
+        with open(filename, "wb") as f:
+            f.write(response.content)
+        print("✅ Model downloaded.")
+
+# Call the download function before loading model
+download_model_from_drive("1b-vO7pxnKlnhbS_-0E6Rzzz-QxOC_jg5", model_path)
 
 # ----------------------------------
 # ✅ Load model
@@ -32,7 +49,7 @@ def load_model():
 model = load_model()
 
 # ----------------------------------
-# ✅ Grad-CAM
+# ✅ Grad-CAM setup
 cam_extractor = SmoothGradCAMpp(model, target_layer="layer4")
 
 # ----------------------------------
@@ -47,11 +64,10 @@ def preprocess_image(image):
     return transform(image).unsqueeze(0)
 
 # ----------------------------------
-# ✅ Predict & Heatmap
+# ✅ Prediction & Grad-CAM Heatmap
 def predict_and_visualize(image):
     input_tensor = preprocess_image(image).to(device)
 
-    # ⚠️ DO NOT USE torch.no_grad() here
     model.zero_grad()
     output = model(input_tensor)
 
@@ -69,13 +85,12 @@ def predict_and_visualize(image):
 
     return result, class_names[pred_class]
 
-
 # ----------------------------------
 # ✅ Streamlit UI
 st.title("🚗 Car Damage Detection with Grad-CAM")
-# 📤 Image input section (upload or camera)
-st.subheader("📸 Choose Image Source")
 
+# 📤 Image input section
+st.subheader("📸 Choose Image Source")
 input_option = st.radio("Select image input mode:", ["Upload Image", "Use Camera"])
 
 if input_option == "Upload Image":
@@ -91,14 +106,14 @@ else:
     else:
         image = None
 
-# ✅ Prediction and visualization
+# ✅ Prediction and Grad-CAM
 if image:
     with st.spinner("🔍 Analyzing..."):
         heatmap_img, predicted_label = predict_and_visualize(image)
 
     st.success(f"✅ Predicted: **{predicted_label}**")
 
-    # 🔄 Side-by-side original and Grad-CAM
+    # 🔄 Side-by-side display
     col1, col2 = st.columns(2)
 
     with col1:
@@ -108,13 +123,10 @@ if image:
         st.image(heatmap_img, caption="🔥 Grad-CAM Heatmap", use_column_width=True)
 
     # 📥 Download Prediction Report
-    from io import StringIO
     report_str = f"Predicted class: {predicted_label}\nModel: ResNet18\nGrad-CAM applied: Yes"
-    report_io = StringIO(report_str)
-
     st.download_button(
         label="📥 Download Prediction Report",
-        data=report_io.getvalue(),
+        data=report_str,
         file_name="car_damage_prediction.txt",
         mime="text/plain"
     )
